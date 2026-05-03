@@ -12,6 +12,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set version from tag
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" Resources/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" Resources/Info.plist
+
       - name: Build release binary
         run: swift build -c release
 
@@ -27,13 +34,11 @@ jobs:
 
       - name: Create zip and capture metadata
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          ZIP="MachineHealth-${VERSION}.zip"
+          ZIP="MachineHealth-${{ env.VERSION }}.zip"
           zip -r "${ZIP}" MachineHealth.app
           SHA256=$(shasum -a 256 "${ZIP}" | awk '{print $1}')
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-          echo "ZIP=${ZIP}"         >> $GITHUB_ENV
-          echo "SHA256=${SHA256}"   >> $GITHUB_ENV
+          echo "ZIP=${ZIP}"       >> $GITHUB_ENV
+          echo "SHA256=${SHA256}" >> $GITHUB_ENV
 
       - name: Create GitHub Release
         run: |
