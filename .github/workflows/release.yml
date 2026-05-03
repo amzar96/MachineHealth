@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build release binary
+        run: swift build -c release
+
+      - name: Bundle app
+        run: |
+          mkdir -p MachineHealth.app/Contents/MacOS
+          mkdir -p MachineHealth.app/Contents/Resources
+          cp .build/release/MachineHealth MachineHealth.app/Contents/MacOS/MachineHealth
+          cp Resources/Info.plist MachineHealth.app/Contents/Info.plist
+          cp Resources/AppIcon.icns MachineHealth.app/Contents/Resources/AppIcon.icns
+          xattr -cr MachineHealth.app
+          codesign --force --deep --sign - MachineHealth.app
+
+      - name: Create zip and capture metadata
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          ZIP="MachineHealth-${VERSION}.zip"
+          zip -r "${ZIP}" MachineHealth.app
+          SHA256=$(shasum -a 256 "${ZIP}" | awk '{print $1}')
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "ZIP=${ZIP}"         >> $GITHUB_ENV
+          echo "SHA256=${SHA256}"   >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "${{ github.ref_name }}" "${{ env.ZIP }}" \
+            --title "MachineHealth ${{ github.ref_name }}" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Homebrew tap
+        run: |
+          git clone https://x-access-token:${{ secrets.HOMEBREW_TAP_TOKEN }}@github.com/amzar96/homebrew-tap.git /tmp/homebrew-tap
+          cd /tmp/homebrew-tap
+          sed -i '' "s/version \".*\"/version \"${{ env.VERSION }}\"/" Casks/machinehealth.rb
+          sed -i '' "s/sha256 \".*\"/sha256 \"${{ env.SHA256 }}\"/" Casks/machinehealth.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/machinehealth.rb
+          git commit -m "chore: bump machinehealth to ${{ env.VERSION }}"
+          git push origin master
