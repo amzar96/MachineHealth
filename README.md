@@ -12,10 +12,9 @@
 ---
 
 ## Screenshot
-
-> _Add a screenshot here — drag the popover open, take a screenshot, save to `assets/screenshot.png`_
-
----
+<div align="center">
+<img src="assets/screenshot.png" width="740" alt="MachineHealth screenshot">
+</div>
 
 ## Features
 
